@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Fartyg över 300 brutto under nordisk flagg</title>
+<link rel="icon" href="data:,">
+<style>
+  /* Sjökortets färger: vattentonat papper, bläck i marinblått och kortmagenta för staplarna. */
+  :root {
+    color-scheme: light;
+    --surface: #EAF0EF;
+    --ink: #15222D;
+    --ink-2: #46586A;
+    --grid: #CAD7D9;
+    --axis: #AEBFC4;
+    --series-confirmed: #A1236A;
+    --series-likely: #D98BB8;
+    --note: #E7DBAE;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  /* Nattläge: samma färger som i sjökortets nattpalett. */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface: #0E1A23;
+      --ink: #E4EDF0;
+      --ink-2: #A5B8C2;
+      --grid: #1D3240;
+      --axis: #2F4959;
+      --series-confirmed: #E27BB5;
+      --series-likely: #8C2F66;
+      --note: #3A3520;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--surface); }
+  body { margin: 0; color: var(--ink); background: var(--surface); font: 1rem/1.55 var(--sans); }
+  main { max-width: 60rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+
+  h1 { font: 600 clamp(1.75rem, 4.5vw, 2.6rem)/1.12 var(--serif); letter-spacing: -0.01em;
+       margin: 0 0 0.75rem; max-width: 24ch; text-wrap: balance; }
+  h2 { font: 600 1.25rem/1.3 var(--serif); margin: 3rem 0 0.75rem; }
+  .lede { color: var(--ink-2); max-width: 62ch; margin: 0 0 0.5rem; }
+  .updated { color: var(--ink-2); font-size: 0.9rem; margin: 0 0 1.75rem; }
+  .banner { background: var(--note); border-left: 4px solid var(--series-confirmed);
+            padding: 0.7rem 1rem; margin: 0 0 1.5rem; max-width: 62ch; }
+  .error { background: var(--note); padding: 0.7rem 1rem; max-width: 62ch; }
+
+  /* Teckenförklaring */
+  .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; list-style: none;
+            padding: 0; margin: 0 0 1rem; font-size: 0.9rem; color: var(--ink-2); }
+  .legend li { display: flex; align-items: center; gap: 0.5rem; }
+  .swatch { width: 0.8rem; height: 0.8rem; border-radius: 2px; flex: none; }
+  .swatch.c { background: var(--series-confirmed); }
+  .swatch.l { background: var(--series-likely); }
+
+  /* Diagram: en rad per land, ett gemensamt mått för alla staplar */
+  .chart { --label-w: 8.5rem; }
+  .row { display: grid; grid-template-columns: var(--label-w) minmax(0, 1fr); column-gap: 1rem; align-items: center; }
+  .name { font: 600 1.15rem/1.2 var(--serif); }
+  .name small { display: block; font: 400 0.8rem/1.4 var(--sans); color: var(--ink-2); margin-top: 0.1rem; }
+  .track { position: relative; display: flex; align-items: center; height: 3.1rem;
+           border-left: 1px solid var(--axis); border-right: 1px solid var(--grid);
+           background: repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px calc(100% / var(--n))); }
+  .track:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .bar { display: flex; flex: none; gap: 2px; width: 0; height: 1.25rem;
+         transition: width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .ready .bar { width: var(--w); }
+  .seg { min-width: 2px; }
+  .seg:last-child { border-radius: 0 4px 4px 0; }
+  .seg.c { background: var(--series-confirmed); }
+  .seg.l { background: var(--series-likely); }
+  .seg:hover { filter: brightness(1.12); }
+  .value { margin-left: 0.5rem; font-size: 0.9rem; white-space: nowrap; }
+  .axis { position: relative; height: 1.6rem; margin-left: calc(var(--label-w) + 1rem);
+          border-top: 1px solid var(--axis); font-size: 0.8rem; color: var(--ink-2); }
+  .axis span { position: absolute; top: 0.3rem; transform: translateX(-50%); font-variant-numeric: tabular-nums; }
+  .axis span:first-child { transform: none; }
+  .axis span:last-child { transform: translateX(-100%); }
+
+  /* Tabell med alla siffror */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; min-width: 38rem; border-collapse: collapse; font-size: 0.95rem; }
+  th, td { padding: 0.6rem 0.75rem 0.6rem 0; text-align: right; border-bottom: 1px solid var(--grid);
+           font-variant-numeric: tabular-nums; }
+  /* Landsnamnen står kvar till vänster när tabellen rullas i sidled på små skärmar. */
+  th[scope="row"], th.land { text-align: left; position: sticky; left: 0; background: var(--surface); }
+  thead th { color: var(--ink-2); font-weight: 500; vertical-align: bottom; border-bottom-color: var(--axis); }
+  thead th[colspan] { text-align: center; padding-bottom: 0.3rem; }
+  tbody th { font-weight: 600; font-family: var(--serif); font-size: 1.05rem; }
+  tfoot th, tfoot td { font-weight: 600; border-top: 1px solid var(--axis); border-bottom: 0; }
+
+  /* Metodtext */
+  .notes { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 0.9rem 1.5rem; margin: 0; max-width: 62rem; }
+  .notes dt { font-weight: 600; }
+  .notes dd { margin: 0; max-width: 62ch; }
+
+  /* Förklaring som visas vid hovring och tangentbordsfokus */
+  #tip { position: fixed; z-index: 10; pointer-events: none; min-width: 12rem; max-width: 18rem;
+         padding: 0.6rem 0.75rem; background: var(--surface); color: var(--ink);
+         border: 1px solid var(--axis); border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+         font-size: 0.875rem; }
+  #tip[hidden] { display: none; }
+  .tip-title { font: 600 1rem/1.2 var(--serif); margin-bottom: 0.35rem; }
+  .tip-row { display: flex; align-items: baseline; gap: 0.5rem; }
+  .tip-key { width: 0.9rem; height: 3px; align-self: center; flex: none; }
+  .tip-key.c { background: var(--series-confirmed); }
+  .tip-key.l { background: var(--series-likely); }
+  .tip-val { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+  .tip-lab { color: var(--ink-2); }
+  .tip-foot { color: var(--ink-2); margin-top: 0.35rem; }
+
+  @media (max-width: 38rem) {
+    .row { display: block; margin-top: 0.75rem; }
+    .name small { display: inline; margin-left: 0.5rem; }
+    .track { height: 2.5rem; }
+    .axis { margin-left: 0; }
+    .notes { grid-template-columns: 1fr; gap: 0.15rem; }
+    .notes dd { margin-bottom: 0.85rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+
+  /* Mönster som reservkanal när färg inte går att läsa: kontrastläge, tvingade färger och utskrift. */
+  @media (forced-colors: active), (prefers-contrast: more), print {
+    .seg.l, .swatch.l, .tip-key.l {
+      background-image: repeating-linear-gradient(45deg, currentColor 0 2px, transparent 2px 6px);
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Fartyg över 300 brutto under nordisk flagg</h1>
+  <p class="lede" id="lede"></p>
+  <p class="updated" id="updated"></p>
+  <p class="banner" id="banner" hidden></p>
+
+  <ul class="legend" id="legend" hidden></ul>
+  <div class="chart" id="chart" role="group" aria-label="Stapeldiagram: antal fartyg per land"></div>
+
+  <h2 id="table-title">Alla siffror</h2>
+  <div class="table-wrap"><table id="table" aria-labelledby="table-title"></table></div>
+
+  <h2>Så räknas fartygen</h2>
+  <dl class="notes" id="notes"></dl>
+
+  <p class="error" id="error" role="alert" hidden></p>
+  <noscript><p class="error">Sidan behöver JavaScript för att visa siffrorna.</p></noscript>
+</main>
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const AREA = {
+    global: "hela världen, så långt AIS-mottagarna når",
+    nordic: "nordiska farvatten",
+  };
+  const nf = new Intl.NumberFormat("sv-SE");
+  const dtf = new Intl.DateTimeFormat("sv-SE", { dateStyle: "long", timeStyle: "short" });
+  const $ = (id) => document.getElementById(id);
+
+  // Bygger element med textContent, aldrig innerHTML, så att data inte kan tolkas som HTML.
+  function h(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, val] of Object.entries(attrs)) {
+      if (key === "class") node.className = val;
+      else if (key === "text") node.textContent = val;
+      else node.setAttribute(key, val);
+    }
+    node.append(...children.filter(Boolean));
+    return node;
+  }
+
+  // Ett gemensamt mått för alla staplar, med runda steg och plats till höger för värdesetiketten.
+  function scale(maxTotal) {
+    const target = Math.max(10, maxTotal * 1.3);
+    const steps = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
+    const step = steps.find((s) => Math.ceil(target / s) <= 6) || 10000;
+    const n = Math.max(2, Math.ceil(target / step));
+    return { step, n, max: step * n };
+  }
+
+  const period = (d) => (d === 1 ? "det senaste dygnet" : `de senaste ${nf.format(d)} dygnen`);
+
+  const tip = $("tip");
+  function tipRow(kind, value, label) {
+    return h("div", { class: "tip-row" },
+      h("span", { class: `tip-key ${kind}` }),
+      h("span", { class: "tip-val", text: nf.format(value) }),
+      h("span", { class: "tip-lab", text: label }));
+  }
+  function showTip(row, x, y) {
+    tip.replaceChildren(
+      h("div", { class: "tip-title", text: row.name }),
+      tipRow("c", row.confirmed_ge, "bekräftade"),
+      tipRow("l", row.likely_ge, "troliga"),
+      h("div", { class: "tip-foot", text: `${nf.format(row.seen)} fartyg sedda totalt` }));
+    tip.hidden = false;
+    const pad = 12;
+    let left = x + pad;
+    let top = y + pad;
+    if (left + tip.offsetWidth > window.innerWidth - 8) left = x - tip.offsetWidth - pad;
+    if (top + tip.offsetHeight > window.innerHeight - 8) top = y - tip.offsetHeight - pad;
+    tip.style.left = Math.max(8, left) + "px";
+    tip.style.top = Math.max(8, top) + "px";
+  }
+  const hideTip = () => { tip.hidden = true; };
+
+  function renderChart(data, rows) {
+    const chart = $("chart");
+    chart.replaceChildren();
+    const { step, n, max } = scale(Math.max(0, ...rows.map((r) => r.total)));
+    chart.style.setProperty("--n", n);
+
+    for (const r of rows) {
+      const bar = h("div", { class: "bar" });
+      bar.style.setProperty("--w", (r.total / max) * 100 + "%");
+      if (r.confirmed_ge > 0) { const s = h("div", { class: "seg c" }); s.style.flex = `${r.confirmed_ge} 0 0`; bar.append(s); }
+      if (r.likely_ge > 0) { const s = h("div", { class: "seg l" }); s.style.flex = `${r.likely_ge} 0 0`; bar.append(s); }
+
+      const label = r.likely_ge > 0
+        ? `${nf.format(r.confirmed_ge)} + ${nf.format(r.likely_ge)}`
+        : nf.format(r.confirmed_ge);
+      const track = h("div", {
+        class: "track", tabindex: "0", role: "img",
+        "aria-label": `${r.name}: ${r.confirmed_ge} bekräftade och ${r.likely_ge} troliga fartyg`,
+      }, bar, h("span", { class: "value", text: label }));
+
+      track.addEventListener("pointermove", (e) => showTip(r, e.clientX, e.clientY));
+      track.addEventListener("pointerdown", (e) => showTip(r, e.clientX, e.clientY));
+      track.addEventListener("pointerleave", hideTip);
+      track.addEventListener("focus", () => {
+        const box = track.getBoundingClientRect();
+        showTip(r, box.left + 24, box.top + box.height / 2);
+      });
+      track.addEventListener("blur", hideTip);
+
+      chart.append(h("div", { class: "row" },
+        h("div", { class: "name" }, r.name, h("small", { text: `MID ${r.mids.join(", ")}` })),
+        track));
+    }
+
+    const axis = h("div", { class: "axis", "aria-hidden": "true" });
+    for (let i = 0; i <= n; i++) {
+      const t = h("span", { text: nf.format(i * step) });
+      t.style.left = (i / n) * 100 + "%";
+      axis.append(t);
+    }
+    chart.append(axis);
+    // Staplarna växer fram en gång när sidan laddas.
+    requestAnimationFrame(() => requestAnimationFrame(() => chart.classList.add("ready")));
+  }
+
+  function renderTable(data, rows) {
+    const min = data.min_gt;
+    const table = $("table");
+    const num = (v) => h("td", { text: nf.format(v) });
+    const sum = (key) => rows.reduce((a, r) => a + r[key], 0);
+
+    table.replaceChildren(
+      h("thead", {},
+        h("tr", {},
+          h("th", { rowspan: 2, scope: "col", class: "land", text: "Land" }),
+          h("th", { rowspan: 2, scope: "col", text: "Sedda totalt" }),
+          h("th", { colspan: 2, scope: "colgroup", text: `${nf.format(min)} brutto eller mer` }),
+          h("th", { colspan: 2, scope: "colgroup", text: `Under ${nf.format(min)} brutto` }),
+          h("th", { rowspan: 2, scope: "col", text: "Okänd storlek" })),
+        h("tr", {}, ...["Bekräftade", "Troliga", "Bekräftade", "Troliga"].map((t) => h("th", { scope: "col", text: t })))),
+      h("tbody", {}, ...rows.map((r) => h("tr", {},
+        h("th", { scope: "row", text: r.name }),
+        num(r.seen), num(r.confirmed_ge), num(r.likely_ge), num(r.confirmed_lt), num(r.likely_lt), num(r.unknown)))),
+      h("tfoot", {}, h("tr", {},
+        h("th", { scope: "row", text: "Totalt" }),
+        ...["seen", "confirmed_ge", "likely_ge", "confirmed_lt", "likely_lt", "unknown"].map((k) => h("td", { text: nf.format(sum(k)) })))));
+  }
+
+  function renderNotes(data) {
+    const min = nf.format(data.min_gt);
+    const items = [
+      ["Flagga", "Landet härleds ur de tre första siffrorna i fartygets MMSI-nummer (landskoden MID). Det kan avvika från den registrerade flaggstaten, till exempel efter omflaggning."],
+      ["Bekräftade", `Fartyg vars IMO-nummer finns i ett register med bruttodräktighet, och där bruttodräktigheten är ${min} eller mer. Bara fartyg med giltigt IMO-nummer kan slås upp.` +
+        (data.gt_register_size === 0 ? " Inget register är inläst än, så den här kolumnen är noll." : "")],
+      ["Troliga", `Fartyg utan känd bruttodräktighet där AIS anger en längd på minst ${nf.format(data.proxy_length_m)} meter. Det är en grov uppskattning, eftersom bruttodräktigheten också beror på fartygstyp och bredd.`],
+      ["Täckning", `Insamlingsområde: ${AREA[data.area] || data.area}. AIS-mottagarna når inte hela havet och en del fartyg stänger av sin sändare, så de verkliga flottorna är större än siffrorna här.`],
+      ["Källa", "AIS-data från aisstream.io. Bruttodräktighet från register."],
+    ];
+    $("notes").replaceChildren(...items.flatMap(([term, text]) => [h("dt", { text: term }), h("dd", { text })]));
+  }
+
+  function render(data) {
+    const min = nf.format(data.min_gt);
+    const title = `Fartyg över ${min} brutto under nordisk flagg`;
+    document.title = title;
+    $("title").textContent = title;
+    $("lede").textContent = `Antal fartyg som setts i AIS ${period(data.window_days)}, fördelade efter flaggstat. ` +
+      "Siffrorna visar vad mottagarna har sett, inte flottornas hela storlek.";
+    $("updated").textContent = `Uppdaterad ${dtf.format(new Date(data.generated_at))}.`;
+
+    if (data.sample) {
+      const banner = $("banner");
+      banner.textContent = "Exempeldata. Siffrorna är påhittade och kommer från en testserver, inte från verklig AIS-trafik.";
+      banner.hidden = false;
+    }
+
+    const legend = $("legend");
+    legend.replaceChildren(
+      h("li", {}, h("span", { class: "swatch c" }), `Bekräftade: bruttodräktighet känd, ${min} eller mer`),
+      h("li", {}, h("span", { class: "swatch l" }), `Troliga: bruttodräktighet saknas, längd minst ${nf.format(data.proxy_length_m)} m`));
+    legend.hidden = false;
+
+    const rows = data.countries
+      .map((c) => ({ ...c, total: c.confirmed_ge + c.likely_ge }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "sv"));
+    renderChart(data, rows);
+    renderTable(data, rows);
+    renderNotes(data);
+  }
+
+  async function main() {
+    try {
+      const res = await fetch("data.json", { cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      render(await res.json());
+    } catch (err) {
+      const box = $("error");
+      box.textContent = "Kunde inte läsa data.json. Öppna sidan via en lokal webbserver, till exempel " +
+        "python3 -m http.server -d docs 8000, och ladda om sidan.";
+      box.hidden = false;
+    }
+  }
+
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
+  window.addEventListener("scroll", hideTip, { passive: true });
+  main();
+})();
+</script>
+</body>
+</html>

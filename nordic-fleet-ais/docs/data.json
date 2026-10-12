@@ -1,0 +1,80 @@
+{
+  "generated_at": "2026-10-01T15:17:56+00:00",
+  "sample": true,
+  "area": "global",
+  "window_days": 7,
+  "min_gt": 300,
+  "proxy_length_m": 40,
+  "gt_register_size": 206,
+  "countries": [
+    {
+      "code": "SE",
+      "name": "Sverige",
+      "mids": [
+        "265",
+        "266"
+      ],
+      "seen": 60,
+      "confirmed_ge": 29,
+      "confirmed_lt": 0,
+      "likely_ge": 17,
+      "likely_lt": 14,
+      "unknown": 0
+    },
+    {
+      "code": "NO",
+      "name": "Norge",
+      "mids": [
+        "257",
+        "258",
+        "259"
+      ],
+      "seen": 140,
+      "confirmed_ge": 41,
+      "confirmed_lt": 0,
+      "likely_ge": 65,
+      "likely_lt": 34,
+      "unknown": 0
+    },
+    {
+      "code": "DK",
+      "name": "Danmark",
+      "mids": [
+        "219",
+        "220"
+      ],
+      "seen": 110,
+      "confirmed_ge": 40,
+      "confirmed_lt": 0,
+      "likely_ge": 48,
+      "likely_lt": 22,
+      "unknown": 0
+    },
+    {
+      "code": "FI",
+      "name": "Finland",
+      "mids": [
+        "230"
+      ],
+      "seen": 70,
+      "confirmed_ge": 27,
+      "confirmed_lt": 1,
+      "likely_ge": 25,
+      "likely_lt": 17,
+      "unknown": 0
+    },
+    {
+      "code": "IS",
+      "name": "Island",
+      "mids": [
+        "251"
+      ],
+      "seen": 12,
+      "confirmed_ge": 1,
+      "confirmed_lt": 0,
+      "likely_ge": 6,
+      "likely_lt": 5,
+      "unknown": 0
+    }
+  ]
+}
