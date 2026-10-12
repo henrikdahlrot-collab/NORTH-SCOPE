@@ -7,6 +7,9 @@ Så här fungerar det:
   2. Härleder flagga ur landskoden (MID) i MMSI-numret.
   3. Slår upp bruttodräktighet (GT) via IMO-numret i gt_register.csv.
   4. Skriver docs/data.json, som docs/index.html visar.
+  5. Lägger en rad per körning i docs/history.json (antal per land, fartygstyp
+     och längdklass), så att utveckling över tid kan visas. Historik går inte
+     att hämta i efterhand, eftersom aisstream.io inte spelar upp gammal data.
 
 Exempel:
   python3 collector.py --minutes 10      # prova i 10 minuter
@@ -45,6 +48,14 @@ AREAS = {
     "global": [[[-90.0, -180.0], [90.0, 180.0]]],
     "nordic": [[[52.0, -12.0], [72.0, 32.0]], [[62.0, -25.0], [67.5, -12.0]]],
 }
+
+
+# Fartygstyper efter AIS-koden (ITU-R M.1371). Klasserna är grova med flit:
+# koden anges av besättningen och är inte alltid rätt.
+TYPE_CLASSES = ("passenger", "cargo", "tanker", "fishing", "highspeed",
+                "special", "pleasure", "other", "unknown")
+# Längdklasser i meter, ur måtten A+B i AIS.
+LENGTH_BUCKETS = ("unknown", "lt40", "40-99", "100-199", "ge200")
 
 
 class CollectError(RuntimeError):
@@ -96,6 +107,42 @@ def to_int(value) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def ship_class(code) -> str:
+    """AIS-fartygstyp (tvåsiffrig kod) till en av TYPE_CLASSES."""
+    code = to_int(code)
+    if code == 0:
+        return "unknown"
+    if 60 <= code <= 69:
+        return "passenger"
+    if 70 <= code <= 79:
+        return "cargo"
+    if 80 <= code <= 89:
+        return "tanker"
+    if code == 30:
+        return "fishing"
+    if 40 <= code <= 49:
+        return "highspeed"
+    if code in (36, 37):
+        return "pleasure"
+    if 31 <= code <= 35 or 50 <= code <= 59:  # bogsering, bagger, lots, räddning, myndighet m.m.
+        return "special"
+    return "other"
+
+
+def length_bucket(length) -> str:
+    """Längd i meter till en av LENGTH_BUCKETS."""
+    n = to_int(length)
+    if n <= 0:
+        return "unknown"
+    if n < 40:
+        return "lt40"
+    if n < 100:
+        return "40-99"
+    if n < 200:
+        return "100-199"
+    return "ge200"
 
 
 def parse_static(msg) -> dict | None:
@@ -161,16 +208,21 @@ def load_gt_register(path: Path) -> dict[int, float]:
     return register
 
 
-def load_state(path: Path) -> tuple[dict, bool | None]:
-    """Sedda fartyg från tidigare körningar, och om de kom från en testserver."""
+def load_state(path: Path) -> tuple[dict, bool | None, str | None]:
+    """Sedda fartyg från tidigare körningar, om de kom från en testserver och när
+    insamlingen startade (äldre filer saknar tidpunkten, då uppskattas den)."""
     if not path.exists():
-        return {}, None
+        return {}, None, None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return dict(data.get("vessels", {})), bool(data.get("sample", False))
-    except (OSError, ValueError):
+        vessels = dict(data.get("vessels", {}))
+        started = data.get("started")
+        if not started and vessels:
+            started = min(v.get("first_seen") or v["last_seen"] for v in vessels.values())
+        return vessels, bool(data.get("sample", False)), started
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
         print(f"Varning: kunde inte läsa {path}. Börjar om med tomt läge.", file=sys.stderr)
-        return {}, None
+        return {}, None, None
 
 
 def write_json(path: Path, data: dict) -> None:
@@ -185,13 +237,20 @@ def write_json(path: Path, data: dict) -> None:
 def build_report(vessels: dict, gt_by_imo: dict, args, sample: bool, now: datetime) -> dict:
     cutoff = now - timedelta(days=args.window_days)
     keys = ("seen", "confirmed_ge", "confirmed_lt", "likely_ge", "likely_lt", "unknown")
-    stats = {code: dict.fromkeys(keys, 0) for code in COUNTRIES}
+    stats = {
+        code: {**dict.fromkeys(keys, 0),
+               "types": dict.fromkeys(TYPE_CLASSES, 0),
+               "lengths": dict.fromkeys(LENGTH_BUCKETS, 0)}
+        for code in COUNTRIES
+    }
 
     for v in vessels.values():
         if datetime.fromisoformat(v["last_seen"]) < cutoff:
             continue
         s = stats[v["flag"]]
         s["seen"] += 1
+        s["types"][ship_class(v.get("ship_type"))] += 1
+        s["lengths"][length_bucket(v.get("length"))] += 1
         gt = gt_by_imo.get(v["imo"]) if v.get("imo") else None
         if gt is not None:  # bruttodräktigheten är känd från registret
             s["confirmed_ge" if gt >= args.min_gt else "confirmed_lt"] += 1
@@ -215,6 +274,54 @@ def build_report(vessels: dict, gt_by_imo: dict, args, sample: bool, now: dateti
             for code, c in COUNTRIES.items()
         ],
     }
+
+
+def coverage_days(started: str | None, now: datetime, window_days: float) -> float | None:
+    """Hur många dygn av räknefönstret som insamlingen faktiskt har pågått.
+    Under uppbyggnaden är siffrorna lägre än de blir, och raden märks därefter."""
+    try:
+        began = datetime.fromisoformat(started)
+        return round(min(window_days, max(0.0, (now - began).total_seconds() / 86400)), 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def make_snapshot(report: dict, minutes: float, received: int, coverage: float | None) -> dict:
+    """En historikrad: samma siffror som i rapporten, plus hur de kom till."""
+    keep = ("seen", "confirmed_ge", "confirmed_lt", "likely_ge", "likely_lt", "unknown", "types", "lengths")
+    return {
+        "t": report["generated_at"],
+        "area": report["area"],
+        "window_days": report["window_days"],
+        "coverage_days": coverage,
+        "listened_min": round(minutes, 1),
+        "received": received,
+        "min_gt": report["min_gt"],
+        "proxy_length_m": report["proxy_length_m"],
+        "gt_register_size": report["gt_register_size"],
+        "countries": {c["code"]: {k: c[k] for k in keep} for c in report["countries"]},
+    }
+
+
+def read_history(path: Path) -> list | None:
+    """Tidigare rader. Tom lista om filen saknas, None om den inte går att läsa
+    (då rörs den inte, så att historiken aldrig skrivs över av misstag)."""
+    if not path.exists():
+        return []
+    try:
+        rows = json.loads(path.read_text(encoding="utf-8"))["snapshots"]
+        return rows if isinstance(rows, list) else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def write_history(path: Path, rows: list) -> None:
+    """En rad per körning i filen, så att ändringarna syns tydligt i GitHub."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = ",\n".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) for r in rows)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text('{"version":1,"snapshots":[\n' + body + "\n]}\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def print_summary(report: dict) -> None:
@@ -319,6 +426,10 @@ def main() -> int:
                    help="var sedda fartyg sparas mellan körningar")
     p.add_argument("--out", default=str(ROOT / "docs" / "data.json"),
                    help="filen som webbsidan läser")
+    p.add_argument("--history", default=None,
+                   help="fil med en rad per körning. Standard: docs/history.json. Körningar mot "
+                        "testserver sparas bara om du anger den här själv")
+    p.add_argument("--no-history", action="store_true", help="spara ingen historikrad")
     p.add_argument("--url", default=None, help="annan websocket-adress (för test)")
     p.add_argument("--api-key", default=None, help="API-nyckel (annars AISSTREAM_API_KEY eller .env)")
     args = p.parse_args()
@@ -327,9 +438,11 @@ def main() -> int:
     url = args.url or os.environ.get("AISSTREAM_URL") or DEFAULT_URL
     state_path, out_path = Path(args.state), Path(args.out)
 
-    vessels, state_sample = load_state(state_path)
+    vessels, state_sample, started = load_state(state_path)
     gt_by_imo = load_gt_register(Path(args.gt_file))
     exit_code = 0
+    received = matched = 0
+    listened_s = 0.0
 
     if args.minutes > 0:
         api_key = args.api_key or os.environ.get("AISSTREAM_API_KEY", "")
@@ -346,9 +459,10 @@ def main() -> int:
         if state_sample is not None and state_sample != sample:
             print("Obs: de sparade fartygen kommer från en annan källa (test eller riktig). "
                   "Börjar om med tomt läge.")
-            vessels = {}
+            vessels, started = {}, None
 
         print(f"Lyssnar i {args.minutes:g} minuter ({args.area}). Avbryt med Ctrl+C.")
+        began_listening = time.monotonic()
         try:
             received, matched = asyncio.run(
                 collect(url, api_key, AREAS[args.area], args.minutes * 60, vessels))
@@ -360,19 +474,51 @@ def main() -> int:
             exit_code = 1
         except KeyboardInterrupt:
             print("\nAvbrutet. Sparar det som hunnit samlas in.")
+        listened_s = time.monotonic() - began_listening
     else:
         sample = bool(state_sample)
 
     now = now_utc()
     cutoff = now - timedelta(days=args.window_days)
     vessels = {m: v for m, v in vessels.items() if datetime.fromisoformat(v["last_seen"]) >= cutoff}
+    started = started or now.isoformat()  # ingen tidigare insamling: den börjar nu
 
-    write_json(state_path, {"updated": now.isoformat(), "sample": sample, "vessels": vessels})
+    write_json(state_path, {"updated": now.isoformat(), "started": started,
+                            "sample": sample, "vessels": vessels})
     report = build_report(vessels, gt_by_imo, args, sample, now)
     write_json(out_path, report)
     print_summary(report)
     print(f"\nSkrev {out_path}")
+
+    if save_history(args, report, sample, exit_code, received, listened_s, started, now):
+        exit_code = 1
     return exit_code
+
+
+def save_history(args, report: dict, sample: bool, exit_code: int, received: int,
+                 listened_s: float, started: str | None, now: datetime) -> bool:
+    """Lägger till en historikrad när den är trovärdig. Returnerar True vid fel."""
+    if args.no_history or args.minutes <= 0:
+        return False
+    if exit_code != 0 or received == 0:
+        print("Ingen historikrad sparades eftersom insamlingen inte gav några nya meddelanden.")
+        return False
+    if sample and not args.history:
+        print("Ingen historikrad sparades eftersom data kommer från en testserver. "
+              "Ange --history om den ändå ska sparas.")
+        return False
+
+    path = Path(args.history) if args.history else ROOT / "docs" / "history.json"
+    rows = read_history(path)
+    if rows is None:
+        print(f"Fel: kunde inte läsa {path}. Filen lämnas orörd och ingen historikrad sparades. "
+              "Rätta eller flytta filen och kör igen.", file=sys.stderr)
+        return True
+    rows.append(make_snapshot(report, listened_s / 60, received,
+                              coverage_days(started, now, args.window_days)))
+    write_history(path, rows)
+    print(f"Lade till rad {len(rows)} i {path}")
+    return False
 
 
 if __name__ == "__main__":
