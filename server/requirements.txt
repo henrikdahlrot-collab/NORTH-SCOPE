@@ -1,0 +1,2 @@
+websockets>=13.0
+psycopg[binary]>=3.2

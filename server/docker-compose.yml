@@ -1,0 +1,42 @@
+# NORTH SCOPE: databas och kontinuerlig insamling.
+# Starta:  docker compose up -d --build
+# Loggar:  docker compose logs -f collector
+# Obs: den här filen är skriven men ännu inte provkörd med Docker.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: north
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Sätt POSTGRES_PASSWORD i filen .env}
+      POSTGRES_DB: northscope
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Körs bara första gången databasen skapas.
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U north -d northscope"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Databasen exponeras inte mot internet. Lägg till "ports" här bara om du vet varför.
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  collector:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      AISSTREAM_API_KEY: ${AISSTREAM_API_KEY:?Sätt AISSTREAM_API_KEY i filen .env}
+      DATABASE_URL: postgresql://north:${POSTGRES_PASSWORD}@db:5432/northscope
+      AREA: ${AREA:-nordeuropa}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+volumes:
+  pgdata:
