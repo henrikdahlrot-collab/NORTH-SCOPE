@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: "17 */6 * * *"   # var sjätte timme
   workflow_dispatch:          # gör det möjligt att starta manuellt
+    inputs:
+      minutes:
+        description: "Minuter att lyssna (30 som standard, 3 räcker för ett snabbt test)"
+        default: "30"
 
 permissions:
   contents: write
@@ -35,12 +39,15 @@ jobs:
           key: vessels-${{ github.run_id }}
           restore-keys: vessels-
 
-      - name: Samla AIS-data i 30 minuter
+      # Fartygslistan i cachen räknas om vid varje körning, så en kort manuell körning ger
+      # ändå fullständiga siffror för hela räknefönstret.
+      - name: Samla AIS-data
         env:
           AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
-        run: python collector.py --minutes 30
+          MINUTES: ${{ inputs.minutes || '30' }}
+        run: python collector.py --minutes "$MINUTES"
 
-            # docs/history.json får en rad per körning. Den går inte att återskapa i efterhand.
+      # docs/history.json får en rad per körning. Den går inte att återskapa i efterhand.
       - name: Spara siffrorna och historiken i repot
         run: |
           git config user.name "ais-collector"
