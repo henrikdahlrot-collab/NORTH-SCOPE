@@ -40,7 +40,7 @@ jobs:
           AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
         run: python collector.py --minutes 30
 
-      # docs/history.json får en rad per körning. Den går inte att återskapa i efterhand.
+            # docs/history.json får en rad per körning. Den går inte att återskapa i efterhand.
       - name: Spara siffrorna och historiken i repot
         run: |
           git config user.name "ais-collector"
