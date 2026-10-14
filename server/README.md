@@ -4,15 +4,17 @@ Det här är den del av NORTH SCOPE som lyssnar på AIS hela tiden och sparar i 
 
 ```
 aisstream.io  →  live_collector.py  →  PostgreSQL + PostGIS (tabellerna i schema.sql)
+                                         ↑                ↓
+                                    ports.py         port_calls.py  →  anlöp och förbindelser
 ```
 
 Den befintliga insamlingen på GitHub (`collector.py`) fortsätter att fungera. Servern ersätter den inte än.
 
 ## Vad som är provat och inte
 
-Provat (mot en låtsasström och en riktig PostGIS-databas): tolkning av meddelanden, utglesning, uteslutning av fartygstyper, ogiltiga koordinater, kuststationer och sjömärken, återanslutning när anslutningen bryts, databas som startas om under körning, felaktig eller saknad API-nyckel.
+Provat (mot en låtsasström och en riktig PostGIS-databas): tolkning av meddelanden, utglesning, uteslutning av fartygstyper, ogiltiga koordinater, kuststationer och sjömärken, återanslutning när anslutningen bryts, databas som startas om under körning, felaktig eller saknad API-nyckel. Dessutom hamninläsning ur UN/LOCODE, anlöpsdetektorn med tio påhittade rörelsemönster och facit (se nedan), omräkning utan dubbletter, förbindelser mellan hamnar, polygonförslag och godkännande.
 
-**Inte provat:** Docker-filerna (`Dockerfile`, `docker-compose.yml`), anslutningen till den riktiga aisstream.io-strömmen, och meddelandeformaten för positionsrapporter och klass B-uppgifter från den riktiga strömmen. Fältnamnen bygger på aisstream.io:s dokumentation, och tolkningen tål olika skiftläge, men första riktiga körningen kan visa avvikelser. Kontrollera därför loggen och tabellen `collector_runs` (se nedan) de första timmarna.
+**Inte provat:** Docker-filerna (`Dockerfile`, `docker-compose.yml`), anslutningen till den riktiga aisstream.io-strömmen, meddelandeformaten för positionsrapporter och klass B-uppgifter från den riktiga strömmen, och detektorn mot riktiga rörelser. Hamnavgränsningarna och inställningarna för anlöp är första gissningar som ska justeras när riktiga positioner finns. Fältnamnen bygger på aisstream.io:s dokumentation, och tolkningen tål olika skiftläge, men första riktiga körningen kan visa avvikelser. Kontrollera därför loggen och tabellen `collector_runs` (se nedan) de första timmarna.
 
 ## Starta på en server
 
@@ -24,6 +26,52 @@ Du behöver en Linux-server med Docker och Docker Compose.
 4. Följ loggen: `docker compose logs -f collector`. Efter en minut ska en rad visa antal meddelanden och sparade positioner.
 
 Databasens port är inte öppen mot internet. Låt det vara så.
+
+## Hamnar och anlöp
+
+Anlöp räknas ur positionerna. Det kräver att hamnarna finns i databasen, och att avgränsningarna är rimliga.
+
+**1. Läs in hamnarna** (en gång, och gärna om efter ett par månader):
+
+```
+docker compose run --rm collector python ports.py load --download
+```
+
+Det hämtar UN/LOCODE (öppen data) från GitHub och lägger en cirkel med 3 km radie runt varje hamn. Koordinaterna i UN/LOCODE är i hela bågminuter (1–2 km) och ligger i stadens mitt, inte i hamnbassängen, så cirklarna är grova. Över 5 000 hamnar saknar koordinater helt, bland annat Gdańsk och Riga. Skriptet listar de nordiska som saknas. Lägg de viktiga i `data/port_extra.csv` (kod, namn, land, latitud, longitud, radie i meter). Koordinaterna där är ungefärliga och ska kontrolleras.
+
+**2. Starta anlöpsdetektorn.** Den ingår i `docker compose up -d` (tjänsten `calls`) och räknar om de senaste 72 timmarna var femte minut. Ett anlöp kräver minst 20 minuter i hamnen och att fartyget gått långsamt (högst 2 knop, och utan att ha angett att det ligger för ankar). Fartyg som passerar i fart räknas inte.
+
+**3. Förbättra avgränsningarna efter en till två veckors data.**
+
+```
+docker compose run --rm collector python ports.py suggest        # förslag ur stillastående fartyg
+docker compose run --rm -v "$PWD:/out" collector python ports.py geojson --out /out/hamnar.geojson
+```
+
+Filen visar nuvarande cirkel (blå) och förslag (orange) för varje hamn, och öppnas på https://geojson.io. Granska på kartan. Förslaget är konvexa höljet kring stillastående fartyg plus 250 m, utan fartyg som anger att de ligger för ankar. Godkänn sedan:
+
+```
+docker compose run --rm collector python ports.py apply SEGOT DKAAL   # bestämda hamnar
+docker compose run --rm collector python ports.py apply --all         # alla med minst 8 fartyg och 50 positioner
+```
+
+Inget godkänns av sig självt, och en godkänd polygon skrivs aldrig över av en ny inläsning av hamnlistan. `python3 ports.py stats` ger en översikt.
+
+**Förbindelser** ligger i vyn `port_legs`: varje anlöp tillsammans med fartygets föregående anlöp.
+
+```sql
+SELECT from_locode, to_locode, count(*) FROM port_legs
+WHERE from_locode IS NOT NULL GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 20;
+```
+
+**Kända begränsningar** (ska också redovisas på sidan):
+
+- Ett fartyg på redden eller på väg förbi nära en hamn kan räknas som anlöp så länge avgränsningen är en cirkel, och kajplatser utanför cirkeln missas.
+- Positionerna glesas ut, så stopp under cirka 20 minuter kan missas. Det gäller främst tätt trafikerade färjelinjer. Mät efter en vecka och justera utglesningen om det behövs.
+- Fartyg som redan låg i hamnen när insamlingen började får `arrival_known = false`. Fartyg som stänger av AIS eller lämnar täckningen i hamnen stängs efter 24 timmars tystnad med `departure_known = false`. Räkna inte med dessa rader när du mäter uppehållstider.
+- Ett fartyg som lämnar täckningen på öppet hav och dyker upp i nästa hamn får ändå en förbindelse, men utan känd sträcka däremellan.
+
+Om databasen redan skapades med en tidigare version av `schema.sql` ska tabellerna `ports` och `port_calls` (som då var tomma) tas bort före en ny inläsning: `DROP VIEW port_legs; DROP TABLE port_calls, ports CASCADE;`
 
 ## Kontrollera att det fungerar
 
@@ -73,6 +121,9 @@ Positioner går inte att hämta i efterhand, så gör en kopia regelbundet och s
 |---|---|
 | `schema.sql` | tabeller för fartyg, positioner, hamnar, anlöp och drift |
 | `live_collector.py` | insamlingen |
+| `ports.py` | läser in hamnar, föreslår och godkänner polygoner |
+| `port_calls.py` | anlöpsdetektorn |
+| `data/port_extra.csv` | hamnar som saknar koordinater i UN/LOCODE, med ungefärliga koordinater |
 | `data/mid_countries.csv` | landskoder (MID) för alla flaggstater, från ITU:s lista |
 | `docker-compose.yml`, `Dockerfile` | databas och insamling som ett paket |
 | `.env.example` | mall för nyckel och lösenord |
@@ -83,10 +134,12 @@ Från projektets rot, mot en egen PostGIS-databas med `schema.sql` inläst (rens
 
 ```
 python3 tests/test_live_collector.py
+python3 tests/test_port_calls.py
 TEST_DATABASE_URL=postgresql://north:north@localhost:5432/northscope python3 tests/run_live_test.py
+TEST_DATABASE_URL=postgresql://north:north@localhost:5432/northscope python3 tests/run_port_test.py
 ```
 
-Det andra provet startar `tests/fake_live_aisstream.py` själv.
+`run_live_test.py` startar `tests/fake_live_aisstream.py` själv. `run_port_test.py` lägger in påhittade hamnar och rörelser och jämför med facit.
 
 ## Villkor
 

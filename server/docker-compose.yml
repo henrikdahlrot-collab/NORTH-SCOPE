@@ -38,5 +38,19 @@ services:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}
 
+  # Räknar fram anlöp ur positionerna var femte minut. Kräver att hamnarna lästs in, se README.
+  calls:
+    build: .
+    command: ["python", "-u", "port_calls.py", "--every", "300"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://north:${POSTGRES_PASSWORD}@db:5432/northscope
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
 volumes:
   pgdata:

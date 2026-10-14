@@ -58,24 +58,40 @@ CREATE INDEX IF NOT EXISTS positions_geom_idx ON positions USING gist (geom);
 CREATE INDEX IF NOT EXISTS positions_ts_idx   ON positions USING brin (ts);
 
 -- ------------------------------------------------------------------ hamnar och anlöp
--- Fylls i steg 3 och 4. area är hamnens polygon; saknas den används en cirkel runt geom.
+-- Hamnarna läses in av ports.py. area är avgränsningen som används för att avgöra om ett
+-- fartyg är i hamnen: först en cirkel runt koordinaten ('circle'), senare en polygon
+-- som är granskad och godkänd ('polygon'). area_suggested är ett förslag ur verkliga positioner.
 CREATE TABLE IF NOT EXISTS ports (
-    locode   text PRIMARY KEY,                    -- UN/LOCODE, t.ex. SEGOT
-    name     text NOT NULL,
-    country  text NOT NULL,
-    geom     geometry(Point, 4326) NOT NULL,
-    area     geometry(Polygon, 4326)
+    locode           text PRIMARY KEY,            -- UN/LOCODE, t.ex. SEGOT
+    name             text NOT NULL,
+    country          text NOT NULL,
+    geom             geometry(Point, 4326) NOT NULL,
+    area             geometry(Polygon, 4326),
+    radius_m         integer NOT NULL DEFAULT 3000,
+    area_source      text NOT NULL DEFAULT 'circle',   -- 'circle' eller 'polygon'
+    coord_source     text NOT NULL DEFAULT 'unlocode', -- 'unlocode' eller 'manual'
+    area_suggested   geometry(Polygon, 4326),
+    suggested_support integer,                    -- antal stillastående positioner bakom förslaget
+    suggested_vessels integer,
+    suggested_at     timestamptz
 );
 CREATE INDEX IF NOT EXISTS ports_geom_idx ON ports USING gist (geom);
+CREATE INDEX IF NOT EXISTS ports_area_idx ON ports USING gist (area);
 
+-- Ett anlöp = ett fartyg som varit i en hamn en viss tid. Skrivs av port_calls.py.
 CREATE TABLE IF NOT EXISTS port_calls (
-    id         bigserial PRIMARY KEY,
-    mmsi       text        NOT NULL,
-    locode     text        NOT NULL REFERENCES ports (locode),
-    arrived    timestamptz NOT NULL,
-    departed   timestamptz,
+    id               bigserial PRIMARY KEY,
+    mmsi             text        NOT NULL,
+    locode           text        NOT NULL REFERENCES ports (locode),
+    arrived          timestamptz NOT NULL,
+    departed         timestamptz,                 -- NULL = fartyget ligger kvar
+    last_inside      timestamptz,                 -- senaste position inne i hamnen
+    arrival_known    boolean NOT NULL DEFAULT true,   -- false: fartyget låg redan i hamnen när insamlingen började
+    departure_known  boolean NOT NULL DEFAULT true,   -- false: fartyget försvann ur täckningen i hamnen
     UNIQUE (mmsi, locode, arrived)
 );
+CREATE INDEX IF NOT EXISTS port_calls_locode_idx ON port_calls (locode, arrived);
+CREATE INDEX IF NOT EXISTS port_calls_open_idx ON port_calls (mmsi) WHERE departed IS NULL;
 
 -- Förbindelser mellan hamnar: varje anlöp tillsammans med fartygets föregående anlöp.
 CREATE OR REPLACE VIEW port_legs AS
