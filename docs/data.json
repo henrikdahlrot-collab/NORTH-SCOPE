@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-08T22:38:34+00:00",
+  "generated_at": "2026-11-09T07:05:55+00:00",
   "sample": false,
   "area": "global",
   "window_days": 7,
@@ -14,33 +14,33 @@
         "265",
         "266"
       ],
-      "seen": 611,
+      "seen": 609,
       "confirmed_ge": 0,
       "confirmed_lt": 0,
       "likely_ge": 169,
-      "likely_lt": 427,
-      "unknown": 15,
+      "likely_lt": 423,
+      "unknown": 17,
       "types": {
-        "passenger": 183,
-        "cargo": 43,
+        "passenger": 184,
+        "cargo": 42,
         "tanker": 44,
-        "fishing": 85,
-        "highspeed": 5,
-        "special": 158,
-        "pleasure": 22,
+        "fishing": 82,
+        "highspeed": 6,
+        "special": 157,
+        "pleasure": 23,
         "other": 50,
         "unknown": 21
       },
       "lengths": {
-        "unknown": 15,
-        "lt40": 427,
+        "unknown": 17,
+        "lt40": 423,
         "40-99": 90,
         "100-199": 61,
         "ge200": 18
       },
       "matrix": {
         "passenger": {
-          "unknown": 4,
+          "unknown": 5,
           "lt40": 116,
           "40-99": 40,
           "100-199": 14,
@@ -48,7 +48,7 @@
         },
         "cargo": {
           "unknown": 0,
-          "lt40": 16,
+          "lt40": 15,
           "40-99": 10,
           "100-199": 8,
           "ge200": 9
@@ -62,13 +62,13 @@
         },
         "fishing": {
           "unknown": 2,
-          "lt40": 76,
+          "lt40": 73,
           "40-99": 7,
           "100-199": 0,
           "ge200": 0
         },
         "highspeed": {
-          "unknown": 0,
+          "unknown": 1,
           "lt40": 5,
           "40-99": 0,
           "100-199": 0,
@@ -76,14 +76,14 @@
         },
         "special": {
           "unknown": 2,
-          "lt40": 146,
+          "lt40": 145,
           "40-99": 9,
           "100-199": 1,
           "ge200": 0
         },
         "pleasure": {
           "unknown": 1,
-          "lt40": 19,
+          "lt40": 20,
           "40-99": 2,
           "100-199": 0,
           "ge200": 0
@@ -112,70 +112,70 @@
         "258",
         "259"
       ],
-      "seen": 1541,
+      "seen": 1485,
       "confirmed_ge": 0,
       "confirmed_lt": 0,
-      "likely_ge": 787,
-      "likely_lt": 743,
+      "likely_ge": 768,
+      "likely_lt": 706,
       "unknown": 11,
       "types": {
-        "passenger": 229,
-        "cargo": 482,
-        "tanker": 98,
-        "fishing": 247,
-        "highspeed": 63,
-        "special": 210,
+        "passenger": 225,
+        "cargo": 468,
+        "tanker": 100,
+        "fishing": 221,
+        "highspeed": 62,
+        "special": 205,
         "pleasure": 24,
-        "other": 174,
+        "other": 166,
         "unknown": 14
       },
       "lengths": {
         "unknown": 11,
-        "lt40": 743,
-        "40-99": 533,
-        "100-199": 184,
+        "lt40": 706,
+        "40-99": 513,
+        "100-199": 185,
         "ge200": 70
       },
       "matrix": {
         "passenger": {
           "unknown": 1,
-          "lt40": 94,
-          "40-99": 71,
+          "lt40": 91,
+          "40-99": 70,
           "100-199": 48,
           "ge200": 15
         },
         "cargo": {
           "unknown": 1,
-          "lt40": 163,
-          "40-99": 228,
+          "lt40": 153,
+          "40-99": 224,
           "100-199": 56,
           "ge200": 34
         },
         "tanker": {
           "unknown": 0,
           "lt40": 3,
-          "40-99": 22,
-          "100-199": 54,
+          "40-99": 23,
+          "100-199": 55,
           "ge200": 19
         },
         "fishing": {
           "unknown": 3,
-          "lt40": 157,
-          "40-99": 85,
+          "lt40": 142,
+          "40-99": 74,
           "100-199": 2,
           "ge200": 0
         },
         "highspeed": {
           "unknown": 0,
-          "lt40": 56,
+          "lt40": 55,
           "40-99": 7,
           "100-199": 0,
           "ge200": 0
         },
         "special": {
           "unknown": 4,
-          "lt40": 173,
-          "40-99": 29,
+          "lt40": 169,
+          "40-99": 28,
           "100-199": 4,
           "ge200": 0
         },
@@ -188,8 +188,8 @@
         },
         "other": {
           "unknown": 2,
-          "lt40": 68,
-          "40-99": 84,
+          "lt40": 64,
+          "40-99": 80,
           "100-199": 19,
           "ge200": 1
         },
@@ -209,29 +209,29 @@
         "219",
         "220"
       ],
-      "seen": 667,
+      "seen": 664,
       "confirmed_ge": 0,
       "confirmed_lt": 0,
-      "likely_ge": 299,
-      "likely_lt": 354,
+      "likely_ge": 298,
+      "likely_lt": 352,
       "unknown": 14,
       "types": {
         "passenger": 62,
         "cargo": 124,
         "tanker": 79,
-        "fishing": 125,
+        "fishing": 124,
         "highspeed": 37,
-        "special": 146,
+        "special": 147,
         "pleasure": 20,
-        "other": 59,
-        "unknown": 15
+        "other": 57,
+        "unknown": 14
       },
       "lengths": {
         "unknown": 14,
-        "lt40": 354,
-        "40-99": 109,
-        "100-199": 108,
-        "ge200": 82
+        "lt40": 352,
+        "40-99": 106,
+        "100-199": 109,
+        "ge200": 83
       },
       "matrix": {
         "passenger": {
@@ -243,10 +243,10 @@
         },
         "cargo": {
           "unknown": 0,
-          "lt40": 20,
-          "40-99": 19,
-          "100-199": 16,
-          "ge200": 69
+          "lt40": 19,
+          "40-99": 18,
+          "100-199": 17,
+          "ge200": 70
         },
         "tanker": {
           "unknown": 0,
@@ -257,7 +257,7 @@
         },
         "fishing": {
           "unknown": 6,
-          "lt40": 115,
+          "lt40": 114,
           "40-99": 4,
           "100-199": 0,
           "ge200": 0
@@ -271,8 +271,8 @@
         },
         "special": {
           "unknown": 2,
-          "lt40": 108,
-          "40-99": 30,
+          "lt40": 110,
+          "40-99": 29,
           "100-199": 6,
           "ge200": 0
         },
@@ -285,14 +285,14 @@
         },
         "other": {
           "unknown": 0,
-          "lt40": 27,
-          "40-99": 27,
+          "lt40": 26,
+          "40-99": 26,
           "100-199": 5,
           "ge200": 0
         },
         "unknown": {
           "unknown": 3,
-          "lt40": 9,
+          "lt40": 8,
           "40-99": 2,
           "100-199": 1,
           "ge200": 0
@@ -305,28 +305,28 @@
       "mids": [
         "230"
       ],
-      "seen": 242,
+      "seen": 239,
       "confirmed_ge": 0,
       "confirmed_lt": 0,
       "likely_ge": 110,
-      "likely_lt": 129,
+      "likely_lt": 126,
       "unknown": 3,
       "types": {
         "passenger": 47,
-        "cargo": 68,
+        "cargo": 66,
         "tanker": 7,
         "fishing": 14,
         "highspeed": 0,
         "special": 70,
         "pleasure": 7,
-        "other": 25,
+        "other": 24,
         "unknown": 4
       },
       "lengths": {
         "unknown": 3,
-        "lt40": 129,
-        "40-99": 42,
-        "100-199": 50,
+        "lt40": 126,
+        "40-99": 43,
+        "100-199": 49,
         "ge200": 18
       },
       "matrix": {
@@ -339,9 +339,9 @@
         },
         "cargo": {
           "unknown": 0,
-          "lt40": 8,
+          "lt40": 7,
           "40-99": 18,
-          "100-199": 35,
+          "100-199": 34,
           "ge200": 7
         },
         "tanker": {
@@ -353,8 +353,8 @@
         },
         "fishing": {
           "unknown": 0,
-          "lt40": 14,
-          "40-99": 0,
+          "lt40": 13,
+          "40-99": 1,
           "100-199": 0,
           "ge200": 0
         },
@@ -381,7 +381,7 @@
         },
         "other": {
           "unknown": 2,
-          "lt40": 15,
+          "lt40": 14,
           "40-99": 4,
           "100-199": 4,
           "ge200": 0
